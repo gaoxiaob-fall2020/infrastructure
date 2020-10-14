@@ -68,7 +68,7 @@ resource "aws_security_group" "sg_22" {
 }
 
 resource "aws_key_pair" "ec2_key" {
-  key_name   = "ssh_public_key"
+  key_name   = var.ssh_key_name
   public_key = file(var.public_key_path)
 }
 

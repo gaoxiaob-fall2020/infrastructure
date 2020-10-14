@@ -36,6 +36,11 @@ variable "public_key_path" {
     default = "~/.ssh/id_rsa.pub"
 }
 
+variable "ssh_key_name" {
+    description = "Name of the ssh public key"
+    default = "ssh_public_key"
+}
+
 variable "ami" {
     default = "ami-0817d428a6fb68645"
 } 
