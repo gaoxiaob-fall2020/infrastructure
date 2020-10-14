@@ -17,14 +17,14 @@
   * <code>$ aws configure --profile profile-name</code>
   * Enter access keys and region as prompted 
 
-**> *Set environment variables(use the <code>export</code> command on Linux/Unix)***
+**> *Set environment variables(use <code>export TF_VAR_<var_below></code> command on Linux/Unix)***
 * <code>profile</code> String. Name of local AWS Authenticated profile
 * <code>region</code> String. Region associated with the profile
 * <code>vpc_cidr</code> String. CIDR block for the VPC
 * <code>subs_cidr</code> Map. CIDR blocks for subnets
 * <code>ava_zones</code> Map. Availability zones under the region. map keys must be consistent with those of subs_cidr
-* <code>public_key_path</code> String. path of your ssh public key
-* <code>ami</code> String. AMI id upon which an EC2 instance will be created for testing
+* <code>public_key_path</code> String. Path of your ssh public key
+* <code>ssh_key_name</code> String. Name of the ssh public key
 * <code>ami</code> String. AMI id upon which an EC2 instance will be created for testing
 * <code>instance_type</code> String. EC2 instance type
 * <code>sub_id</code> String. Subnet id where the EC2 instance get launched
