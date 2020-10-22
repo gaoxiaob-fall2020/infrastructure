@@ -189,11 +189,17 @@ resource "aws_key_pair" "ec2_key" {
   public_key = file(var.public_key_path)
 }
 
+resource "aws_iam_instance_profile" "ins_p" {
+  name = var.iam_r_name
+  role = aws_iam_role.iam_r.name
+}
+
 resource "aws_instance" "app_instance" {
   ami                    = var.ami
   instance_type          = var.instance_type
   subnet_id              = aws_subnet.subs[var.sub_id].id
   vpc_security_group_ids = [aws_security_group.sg_app.id]
+  iam_instance_profile   = aws_iam_instance_profile.ins_p.name
   depends_on             = [aws_db_instance.db_instance]
   # disable_api_termination
   root_block_device {
@@ -246,6 +252,8 @@ resource "aws_iam_policy" "iam_p" {
       "Action": [
         "s3:PutObject",
         "s3:PutObjectAcl",
+        "s3:GetObject",
+        "s3:GetObjectAcl",
         "s3:DeleteObject"
       ],
       "Effect": "Allow",
