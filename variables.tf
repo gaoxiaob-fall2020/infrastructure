@@ -63,3 +63,49 @@ variable "b_name" {
   description = "S3 bucket name"
   default     = "webapp.xiaobin.gao"
 }
+
+variable "db_identifier" {
+  description = "Database identifier"
+  default     = "csye6225-f20"
+}
+
+variable "db_name" {
+  description = "Database name for the application"
+  default     = "csye6225"
+}
+
+variable "db_uname" {
+  description = "Username for the database"
+  default     = "csye6225fall2020"
+}
+
+variable "db_pwd" {
+  description = "Password for the database"
+  default     = "Airw0rd640!"
+}
+
+variable "db_subs_name" {
+    description = "Name of subnet group for the database instance"
+    default = "sb_subs"
+}
+
+variable "dynamodb_tbl_name" {
+    description = "Dynamodb table name"
+    default = "csye6225"
+}
+
+variable "iam_p_name" {
+    default = "WebAppS3"
+}
+
+variable "iam_r_name" {
+    default = "EC2-CSYE6225"
+}
+
+variable "AWS_ACCESS_KEY_ID" {
+    default = "AKIAZWCZYMKJNPA6OFMX"
+}
+
+variable "AWS_SECRET_ACCESS_KEY" {
+    default = "QRJiGlx19FnkrGLyJ4kma3IcKEMJw6TZACpuAhbi"
+}

@@ -123,7 +123,7 @@ resource "aws_kms_key" "s3_key" {
   description             = "This key is used to encrypt bucket objects"
   deletion_window_in_days = 10
   tags = {
-    Name = "b_key_${timestamp()}_tf"
+    Alias = "b_key_${timestamp()}_tf"
   }
 }
 
@@ -164,12 +164,8 @@ resource "aws_s3_bucket" "b" {
 }
 
 resource "aws_db_subnet_group" "db_subs" {
-  name       = "db_subs"
+  name       = var.db_subs_name
   subnet_ids = [for sub in aws_subnet.subs : sub.id]
-
-  # tags = {
-  #   Name = "My DB subnet group"
-  # }
 }
 
 resource "aws_db_instance" "db_instance" {
@@ -178,10 +174,10 @@ resource "aws_db_instance" "db_instance" {
   # engine_version         = "5.6.17"
   instance_class         = "db.t3.micro"
   multi_az               = false
-  identifier             = "csye6225-f20"
-  name                   = "csye6225"
-  username               = "csye6225fall2020"
-  password               = "Airw0rd640!"
+  identifier             = var.db_identifier
+  name                   = var.db_name
+  username               = var.db_uname
+  password               = var.db_pwd
   db_subnet_group_name   = aws_db_subnet_group.db_subs.id
   vpc_security_group_ids = [aws_security_group.sg_db.id]
   # publicly_accessible    = false
@@ -205,20 +201,28 @@ resource "aws_instance" "app_instance" {
     volume_size = 20
     # delete_on_termination
   }
+
   user_data = <<-EOF
     #!/bin/bash
     echo "export DEV_ENV=1" >> /etc/profile
-    echo "export MYSQL_DB_NAME=csye6225" >> /etc/profile
-    echo "export MYSQL_UNAME=csye6225fall2020" >> /etc/profile
-    echo "export MYSQL_PWD=Airw0rd640!" >> /etc/profile
+    echo "export MYSQL_DB_NAME=${aws_db_instance.db_instance.name}" >> /etc/profile
+    echo "export MYSQL_UNAME=${aws_db_instance.db_instance.username}" >> /etc/profile
+    echo "export MYSQL_PWD=${var.db_pwd}" >> /etc/profile
     echo "export MYSQL_HOST=${aws_db_instance.db_instance.address}" >> /etc/profile
-    echo "export MYSQL_PORT=3306" >> /etc/profile
+    echo "export MYSQL_PORT=${aws_db_instance.db_instance.port}" >> /etc/profile
+    echo "export AWS_S3_BUCKET=${aws_s3_bucket.b.id}" >> /etc/profile
+    echo "export AWS_ACCESS_KEY_ID=${var.AWS_ACCESS_KEY_ID}" >> /etc/profile
+    echo "export AWS_SECRET_ACCESS_KEY=${var.AWS_SECRET_ACCESS_KEY}" >> /etc/profile
 	EOF
-  key_name  = aws_key_pair.ec2_key.key_name
+
+  key_name = aws_key_pair.ec2_key.key_name
+  tags = {
+    Name = "app_${timestamp()}_tf"
+  }
 }
 
 resource "aws_dynamodb_table" "dynamodb_tbl" {
-  name           = "csye6225"
+  name           = var.dynamodb_tbl_name
   hash_key       = "id"
   write_capacity = 5
   read_capacity  = 5
@@ -230,7 +234,7 @@ resource "aws_dynamodb_table" "dynamodb_tbl" {
 }
 
 resource "aws_iam_policy" "iam_p" {
-  name = "WebAppS3"
+  name = var.iam_p_name
   # path        = "/"
   description = "IAM policy for EC2 instances to perform S3 buckets"
 
@@ -240,7 +244,9 @@ resource "aws_iam_policy" "iam_p" {
   "Statement": [
     {
       "Action": [
-        "s3:*"
+        "s3:PutObject",
+        "s3:PutObjectAcl",
+        "s3:DeleteObject"
       ],
       "Effect": "Allow",
       "Resource": [
@@ -254,7 +260,7 @@ EOF
 }
 
 resource "aws_iam_role" "iam_r" {
-  name = "EC2-CSYE6225"
+  name = var.iam_r_name
 
   assume_role_policy = <<EOF
 {
