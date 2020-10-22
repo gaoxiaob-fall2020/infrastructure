@@ -28,6 +28,17 @@
 * <code>ami</code> String. AMI id upon which an EC2 instance will be created for testing
 * <code>instance_type</code> String. EC2 instance type
 * <code>sub_id</code> String. Subnet id where the EC2 instance get launched
+* <code>b_name</code> String. S3 bucket name
+* <code>db_identifier</code> String. RDS database identifier
+* <code>db_name</code> String. RDS database name
+* <code>db_uname</code> String. RDS master username
+* <code>db_pwd</code> String. RDS master password
+* <code>db_subs_name</code> String. Name of subnet group for the database instance
+* <code>dynamodb_tbl_name</code> String. Dynamodb table name
+* <code>iam_p_name</code> String. Name of IAM police
+* <code>iam_r_name</code> String. Name of IAM role
+* <code>AWS_ACCESS_KEY_ID</code> String. AWS access ID for the EC2 instance running the application
+* <code>AWS_SECRET_ACCESS_KEY</code> String. AWS secret key for the EC2 instance running the application
 
 **> *Create a VPC and its rescources***
 
