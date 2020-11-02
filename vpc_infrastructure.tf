@@ -163,6 +163,13 @@ resource "aws_s3_bucket" "b" {
   }
 }
 
+resource "aws_s3_bucket_public_access_block" "b_block_public" {
+  bucket = aws_s3_bucket.b.id
+
+  block_public_acls   = true
+  block_public_policy = true
+}
+
 resource "aws_db_subnet_group" "db_subs" {
   name       = var.db_subs_name
   subnet_ids = [for sub in aws_subnet.subs : sub.id]
@@ -217,8 +224,6 @@ resource "aws_instance" "app_instance" {
     echo "export MYSQL_HOST=${aws_db_instance.db_instance.address}" >> /etc/profile
     echo "export MYSQL_PORT=${aws_db_instance.db_instance.port}" >> /etc/profile
     echo "export AWS_S3_BUCKET=${aws_s3_bucket.b.id}" >> /etc/profile
-    echo "export AWS_ACCESS_KEY_ID=${var.AWS_ACCESS_KEY_ID}" >> /etc/profile
-    echo "export AWS_SECRET_ACCESS_KEY=${var.AWS_SECRET_ACCESS_KEY}" >> /etc/profile
 	EOF
 
   key_name = aws_key_pair.ec2_key.key_name
@@ -254,12 +259,14 @@ resource "aws_iam_policy" "iam_p" {
         "s3:PutObjectAcl",
         "s3:GetObject",
         "s3:GetObjectAcl",
-        "s3:DeleteObject"
+        "s3:DeleteObject",
+        "kms:GenerateDataKey"
       ],
       "Effect": "Allow",
       "Resource": [
         "${aws_s3_bucket.b.arn}",
-        "${aws_s3_bucket.b.arn}/*"
+        "${aws_s3_bucket.b.arn}/*",
+        "${aws_kms_key.s3_key.arn}"
       ]
     }
   ]
