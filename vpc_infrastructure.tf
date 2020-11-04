@@ -163,6 +163,15 @@ resource "aws_s3_bucket" "b" {
   }
 }
 
+resource "aws_s3_bucket_public_access_block" "b_block_public" {
+  bucket = aws_s3_bucket.b.id
+
+  block_public_acls       = true
+  block_public_policy     = true
+  ignore_public_acls      = true
+  restrict_public_buckets = true
+}
+
 resource "aws_db_subnet_group" "db_subs" {
   name       = var.db_subs_name
   subnet_ids = [for sub in aws_subnet.subs : sub.id]
@@ -210,20 +219,19 @@ resource "aws_instance" "app_instance" {
 
   user_data = <<-EOF
     #!/bin/bash
-    echo "export DEV_ENV=1" >> /etc/profile
-    echo "export MYSQL_DB_NAME=${aws_db_instance.db_instance.name}" >> /etc/profile
-    echo "export MYSQL_UNAME=${aws_db_instance.db_instance.username}" >> /etc/profile
-    echo "export MYSQL_PWD=${var.db_pwd}" >> /etc/profile
-    echo "export MYSQL_HOST=${aws_db_instance.db_instance.address}" >> /etc/profile
-    echo "export MYSQL_PORT=${aws_db_instance.db_instance.port}" >> /etc/profile
-    echo "export AWS_S3_BUCKET=${aws_s3_bucket.b.id}" >> /etc/profile
-    echo "export AWS_ACCESS_KEY_ID=${var.AWS_ACCESS_KEY_ID}" >> /etc/profile
-    echo "export AWS_SECRET_ACCESS_KEY=${var.AWS_SECRET_ACCESS_KEY}" >> /etc/profile
+    echo "export DEV_ENV=1" >> /etc/environment
+    echo "export MYSQL_DB_NAME=${aws_db_instance.db_instance.name}" >> /etc/environment
+    echo "export MYSQL_UNAME=${aws_db_instance.db_instance.username}" >> /etc/environment
+    echo "export MYSQL_PWD=${var.db_pwd}" >> /etc/environment
+    echo "export MYSQL_HOST=${aws_db_instance.db_instance.address}" >> /etc/environment
+    echo "export MYSQL_PORT=${aws_db_instance.db_instance.port}" >> /etc/environment
+    echo "export AWS_S3_BUCKET=${aws_s3_bucket.b.id}" >> /etc/environment
 	EOF
 
   key_name = aws_key_pair.ec2_key.key_name
   tags = {
     Name = "app_${timestamp()}_tf"
+    For  = "app"
   }
 }
 
@@ -254,12 +262,24 @@ resource "aws_iam_policy" "iam_p" {
         "s3:PutObjectAcl",
         "s3:GetObject",
         "s3:GetObjectAcl",
-        "s3:DeleteObject"
+        "s3:DeleteObject",
+        "kms:GenerateDataKey"
       ],
       "Effect": "Allow",
       "Resource": [
         "${aws_s3_bucket.b.arn}",
-        "${aws_s3_bucket.b.arn}/*"
+        "${aws_s3_bucket.b.arn}/*",
+        "${aws_kms_key.s3_key.arn}"
+      ]
+    },
+    {
+      "Action": [
+          "s3:GetObject"
+      ],
+      "Effect": "Allow",
+      "Resource": [
+        "arn:aws:s3:::${var.codedeploy_b_name}",
+        "arn:aws:s3:::${var.codedeploy_b_name}/*"
       ]
     }
   ]
@@ -301,4 +321,98 @@ resource "aws_instance" "testing" {
   tags = {
     Name = "${timestamp()}_tf"
   }
+}
+
+#####
+# resource "aws_iam_user" "gh_cd_user" {
+#   name = var.gh_cd_uname
+# }
+
+resource "aws_iam_policy" "gh_p1" {
+  name        = "GH-Upload-To-S3"
+  description = "allows GitHub Actions to upload artifacts from latest successful build to dedicated S3 bucket used by CodeDeploy"
+  policy      = <<EOF
+{
+    "Version": "2012-10-17",
+    "Statement": [
+        {
+            "Effect": "Allow",
+            "Action": [
+                "s3:PutObject",
+                "s3:ListBucket"
+            ],
+            "Resource": [
+                "arn:aws:s3:::${var.codedeploy_b_name}",
+		            "arn:aws:s3:::${var.codedeploy_b_name}/*"
+            ]
+        }
+    ]
+}
+EOF
+}
+
+resource "aws_iam_user_policy_attachment" "att1" {
+  user       = var.gh_cd_uname
+  policy_arn = aws_iam_policy.gh_p1.arn
+}
+
+resource "aws_iam_policy" "gh_p2" {
+  name        = "GH-Code-Deploy"
+  description = "allows GitHub Actions to call CodeDeploy APIs to initiate application deployment on EC2 instances"
+  policy      = <<EOF
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Action": [
+        "codedeploy:RegisterApplicationRevision",
+        "codedeploy:GetApplicationRevision"
+      ],
+      "Resource": [
+        "arn:aws:codedeploy:${var.region}:${var.account_id}:application:${var.codedeploy_app_name}"
+      ]
+    },
+    {
+      "Effect": "Allow",
+      "Action": [
+        "codedeploy:CreateDeployment",
+        "codedeploy:GetDeployment"
+      ],
+      "Resource": [
+        "*"
+      ]
+    },
+    {
+      "Effect": "Allow",
+      "Action": [
+        "codedeploy:GetDeploymentConfig"
+      ],
+      "Resource": [
+        "arn:aws:codedeploy:${var.region}:${var.account_id}:deploymentconfig:CodeDeployDefault.OneAtATime",
+        "arn:aws:codedeploy:${var.region}:${var.account_id}:deploymentconfig:CodeDeployDefault.HalfAtATime",
+        "arn:aws:codedeploy:${var.region}:${var.account_id}:deploymentconfig:CodeDeployDefault.AllAtOnce"
+      ]
+    }
+  ]
+}
+  EOF
+}
+
+resource "aws_iam_user_policy_attachment" "att2" {
+  user       = var.gh_cd_uname
+  policy_arn = aws_iam_policy.gh_p2.arn
+}
+
+# output "checkout" {
+#   for_each = aws_iam_policy.gh_p1
+#   value    = "${each.key} - ${each.value}"
+# }
+
+resource "aws_route53_record" "www" {
+  zone_id = var.hosted_zone_id
+  name    = var.api_subdomain_name
+  type    = "A"
+  ttl     = "60"
+  records = [aws_instance.app_instance.public_ip]
 }

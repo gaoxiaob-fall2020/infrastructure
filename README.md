@@ -20,6 +20,7 @@
 **> *Set environment variables(use <code>export TF_VAR_<var_below></code> command on Linux/Unix)***
 * <code>profile</code> String. Name of local AWS Authenticated profile
 * <code>region</code> String. Region associated with the profile
+* <code>account_id</code> String. AWS account ID
 * <code>vpc_cidr</code> String. CIDR block for the VPC
 * <code>subs_cidr</code> Map. CIDR blocks for subnets
 * <code>ava_zones</code> Map. Availability zones under the region. map keys must be consistent with those of subs_cidr
@@ -37,8 +38,11 @@
 * <code>dynamodb_tbl_name</code> String. Dynamodb table name
 * <code>iam_p_name</code> String. Name of IAM police
 * <code>iam_r_name</code> String. Name of IAM role
-* <code>AWS_ACCESS_KEY_ID</code> String. AWS access ID for the EC2 instance running the application
-* <code>AWS_SECRET_ACCESS_KEY</code> String. AWS secret key for the EC2 instance running the application
+* <code>gh_cd_uname</code> String. IAM user name for github actions to perform CD
+* <code>codedeploy_app_name</code> String. Name of CodeDeploy application
+* <code>codedeploy_b_name</code> String. Bucket name for webapp artifacts
+* <code>hosted_zone_id</code> String. Public hosted zone id
+* <code>api_subdomain_name</code> String. Subdomain name for webapp
 
 **> *Create a VPC and its rescources***
 
