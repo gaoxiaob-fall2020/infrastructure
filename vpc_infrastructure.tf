@@ -166,8 +166,10 @@ resource "aws_s3_bucket" "b" {
 resource "aws_s3_bucket_public_access_block" "b_block_public" {
   bucket = aws_s3_bucket.b.id
 
-  block_public_acls   = true
-  block_public_policy = true
+  block_public_acls       = true
+  block_public_policy     = true
+  ignore_public_acls      = true
+  restrict_public_buckets = true
 }
 
 resource "aws_db_subnet_group" "db_subs" {
@@ -272,8 +274,7 @@ resource "aws_iam_policy" "iam_p" {
     },
     {
       "Action": [
-          "s3:Get*",
-          "s3:List*"
+          "s3:GetObject"
       ],
       "Effect": "Allow",
       "Resource": [
@@ -338,8 +339,7 @@ resource "aws_iam_policy" "gh_p1" {
             "Effect": "Allow",
             "Action": [
                 "s3:PutObject",
-                "s3:Get*",
-                "s3:List*"
+                "s3:ListBucket"
             ],
             "Resource": [
                 "arn:aws:s3:::${var.codedeploy_b_name}",
@@ -411,7 +411,7 @@ resource "aws_iam_user_policy_attachment" "att2" {
 
 resource "aws_route53_record" "www" {
   zone_id = var.hosted_zone_id
-  name    = var.domain_name
+  name    = var.api_subdomain_name
   type    = "A"
   ttl     = "60"
   records = [aws_instance.app_instance.public_ip]

@@ -66,7 +66,7 @@ variable "environment_tag" {
 
 variable "b_name" {
   description = "S3 bucket name"
-  default     = "webapp.xiaobin.gao"
+  default     = "dev.webapp.xiaobin.gao"
 }
 
 variable "db_identifier" {
@@ -119,14 +119,16 @@ variable "codedeploy_app_name" {
 
 variable "codedeploy_b_name" {
   description = "Bucket name for CodeDeploy artifacts"
-  default     = "codedeploy.xiaobingao.me"
+  default     = "codedeploy.dev.xiaobingao.me"
 }
 
 
 variable "hosted_zone_id" {
-  default = "Z0936157346WAZDMCQSH3"
+  description = "Public hosted zone id"
+  default     = "Z0936157346WAZDMCQSH3"
 }
 
-variable "domain_name" {
-  default = "dev.xiaobingao.me"
+variable "api_subdomain_name" {
+  description = "Subdomain name for webapp"
+  default     = "api.dev.xiaobingao.me"
 }
