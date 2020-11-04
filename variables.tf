@@ -8,6 +8,11 @@ variable "region" {
   default     = "us-east-1"
 }
 
+variable "account_id" {
+  description = "AWS account ID"
+  default     = "665908175506"
+}
+
 variable "vpc_cidr" {
   description = "CIDR block for the VPC"
   default     = "172.31.0.0/16"
@@ -85,27 +90,43 @@ variable "db_pwd" {
 }
 
 variable "db_subs_name" {
-    description = "Name of subnet group for the database instance"
-    default = "sb_subs"
+  description = "Name of subnet group for the database instance"
+  default     = "sb_subs"
 }
 
 variable "dynamodb_tbl_name" {
-    description = "Dynamodb table name"
-    default = "csye6225"
+  description = "Dynamodb table name"
+  default     = "csye6225"
 }
 
 variable "iam_p_name" {
-    default = "WebAppS3"
+  default = "WebAppS3"
 }
 
 variable "iam_r_name" {
-    default = "EC2-CSYE6225"
+  default = "EC2-CSYE6225"
 }
 
-variable "AWS_ACCESS_KEY_ID" {
-    default = "AKIAZWCZYMKJNPA6OFMX"
+variable "gh_cd_uname" {
+  description = "IAM user name for github actions to perform CD"
+  default     = "ghactions_cd"
 }
 
-variable "AWS_SECRET_ACCESS_KEY" {
-    default = "QRJiGlx19FnkrGLyJ4kma3IcKEMJw6TZACpuAhbi"
+variable "codedeploy_app_name" {
+  description = "Application name in CodeDeploy"
+  default     = "csye6225-webapp"
+}
+
+variable "codedeploy_b_name" {
+  description = "Bucket name for CodeDeploy artifacts"
+  default     = "codedeploy.xiaobingao.me"
+}
+
+
+variable "hosted_zone_id" {
+  default = "Z0936157346WAZDMCQSH3"
+}
+
+variable "domain_name" {
+  default = "dev.xiaobingao.me"
 }
