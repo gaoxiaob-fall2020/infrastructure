@@ -132,3 +132,13 @@ variable "api_subdomain_name" {
   description = "Subdomain name for webapp"
   default     = "api.dev.xiaobingao.me"
 }
+
+variable "app_logging_path" {
+  description = "File path of app logging"
+  default     = "/opt/aws/amazon-cloudwatch-agent/logs/webapp.log"
+}
+
+variable "app_logging_level" {
+  description = "App logging level"
+  default     = "DEBUG"
+}

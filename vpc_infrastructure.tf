@@ -226,6 +226,8 @@ resource "aws_instance" "app_instance" {
     echo "export MYSQL_HOST=${aws_db_instance.db_instance.address}" >> /etc/environment
     echo "export MYSQL_PORT=${aws_db_instance.db_instance.port}" >> /etc/environment
     echo "export AWS_S3_BUCKET=${aws_s3_bucket.b.id}" >> /etc/environment
+    echo "export LOGGING_FILE_PATH=${var.app_logging_path}" >> /etc/environment
+    echo "export LOGGING_LEVEL=${var.app_logging_level}" >> /etc/environment
 	EOF
 
   key_name = aws_key_pair.ec2_key.key_name
@@ -250,7 +252,7 @@ resource "aws_dynamodb_table" "dynamodb_tbl" {
 resource "aws_iam_policy" "iam_p" {
   name = var.iam_p_name
   # path        = "/"
-  description = "IAM policy for EC2 instances to perform S3 buckets"
+  description = "IAM policy for EC2 instances to perform S3 buckets(put & delete files, and get app artifacts), and enable CloudWatch"
 
   policy = <<EOF
 {
@@ -281,6 +283,27 @@ resource "aws_iam_policy" "iam_p" {
         "arn:aws:s3:::${var.codedeploy_b_name}",
         "arn:aws:s3:::${var.codedeploy_b_name}/*"
       ]
+    },
+    {
+        "Effect": "Allow",
+        "Action": [
+            "cloudwatch:PutMetricData",
+            "ec2:DescribeVolumes",
+            "ec2:DescribeTags",
+            "logs:PutLogEvents",
+            "logs:DescribeLogStreams",
+            "logs:DescribeLogGroups",
+            "logs:CreateLogStream",
+            "logs:CreateLogGroup"
+        ],
+        "Resource": "*"
+    },
+    {
+        "Effect": "Allow",
+        "Action": [
+            "ssm:GetParameter"
+        ],
+        "Resource": "arn:aws:ssm:*:*:parameter/AmazonCloudWatch-*"
     }
   ]
 }
