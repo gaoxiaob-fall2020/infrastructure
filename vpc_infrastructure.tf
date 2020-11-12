@@ -312,16 +312,16 @@ resource "aws_iam_role_policy_attachment" "r_p_att" {
   policy_arn = aws_iam_policy.iam_p.arn
 }
 
-resource "aws_instance" "testing" {
-  ami                    = var.ami
-  instance_type          = var.instance_type
-  subnet_id              = aws_subnet.subs[var.sub_id].id
-  vpc_security_group_ids = [aws_security_group.sg_22.id]
-  key_name               = aws_key_pair.ec2_key.key_name
-  tags = {
-    Name = "${timestamp()}_tf"
-  }
-}
+# resource "aws_instance" "testing" {
+#   ami                    = var.ami
+#   instance_type          = var.instance_type
+#   subnet_id              = aws_subnet.subs[var.sub_id].id
+#   vpc_security_group_ids = [aws_security_group.sg_22.id]
+#   key_name               = aws_key_pair.ec2_key.key_name
+#   tags = {
+#     Name = "${timestamp()}_tf"
+#   }
+# }
 
 #####
 # resource "aws_iam_user" "gh_cd_user" {
@@ -415,4 +415,65 @@ resource "aws_route53_record" "www" {
   type    = "A"
   ttl     = "60"
   records = [aws_instance.app_instance.public_ip]
+}
+
+resource "aws_iam_role" "cd_r" {
+  name = var.cd_r_name
+
+  assume_role_policy = <<EOF
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "",
+      "Effect": "Allow",
+      "Principal": {
+        "Service": "codedeploy.amazonaws.com"
+      },
+      "Action": "sts:AssumeRole"
+    }
+  ]
+}
+EOF
+}
+
+resource "aws_iam_role_policy_attachment" "AWSCodeDeployRole" {
+  policy_arn = "arn:aws:iam::aws:policy/service-role/AWSCodeDeployRole"
+  role       = aws_iam_role.cd_r.name
+}
+
+resource "aws_codedeploy_app" "cd_app" {
+  compute_platform = "Server"
+  name             = var.cd_app_name
+}
+
+resource "aws_codedeploy_deployment_group" "cd_g" {
+  app_name               = aws_codedeploy_app.cd_app.name
+  deployment_group_name  = var.cd_group_name
+  service_role_arn       = aws_iam_role.cd_r.arn
+  deployment_config_name = "CodeDeployDefault.AllAtOnce"
+
+  ec2_tag_set {
+    ec2_tag_filter {
+      key   = "For"
+      type  = "KEY_AND_VALUE"
+      value = "app"
+    }
+  }
+
+  # trigger_configuration {
+  #   trigger_events     = ["DeploymentFailure"]
+  #   trigger_name       = "example-trigger"
+  #   trigger_target_arn = aws_sns_topic.example.arn
+  # }
+
+  auto_rollback_configuration {
+    enabled = true
+    events  = ["DEPLOYMENT_FAILURE"]
+  }
+
+  # alarm_configuration {
+  #   alarms  = ["my-alarm-name"]
+  #   enabled = true
+  # }
 }
