@@ -133,6 +133,21 @@ variable "api_subdomain_name" {
   default     = "api.dev.xiaobingao.me"
 }
 
+variable "cd_r_name" {
+  description = "Name of IAM role attached to CodeDeploy group"
+  default     = "CodeDeployServiceRole"
+}
+
+variable "cd_app_name" {
+  description = "Name of CodeDeploy Application"
+  default     = "csye6225-webapp"
+}
+
+variable "cd_group_name" {
+  description = "Name of CodeDeploy application group"
+  default     = "csye6225-webapp-deployment"
+}
+
 variable "app_logging_path" {
   description = "File path of app logging"
   default     = "/opt/aws/amazon-cloudwatch-agent/logs/webapp.log"
@@ -142,3 +157,4 @@ variable "app_logging_level" {
   description = "App logging level"
   default     = "DEBUG"
 }
+
