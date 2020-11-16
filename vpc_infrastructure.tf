@@ -203,39 +203,39 @@ resource "aws_iam_instance_profile" "ins_p" {
   role = aws_iam_role.iam_r.name
 }
 
-resource "aws_instance" "app_instance" {
-  ami                    = var.ami
-  instance_type          = var.instance_type
-  subnet_id              = aws_subnet.subs[var.sub_id].id
-  vpc_security_group_ids = [aws_security_group.sg_app.id]
-  iam_instance_profile   = aws_iam_instance_profile.ins_p.name
-  depends_on             = [aws_db_instance.db_instance]
-  # disable_api_termination
-  root_block_device {
-    volume_type = "gp2"
-    volume_size = 20
-    # delete_on_termination
-  }
+# resource "aws_instance" "app_instance" {
+#   ami                    = var.ami
+#   instance_type          = var.instance_type
+#   subnet_id              = aws_subnet.subs[var.sub_id].id
+#   vpc_security_group_ids = [aws_security_group.sg_app.id]
+#   iam_instance_profile   = aws_iam_instance_profile.ins_p.name
+#   depends_on             = [aws_db_instance.db_instance]
+#   # disable_api_termination
+#   root_block_device {
+#     volume_type = "gp2"
+#     volume_size = 20
+#     # delete_on_termination
+#   }
 
-  user_data = <<-EOF
-    #!/bin/bash
-    echo "export DEV_ENV=1" >> /etc/environment
-    echo "export MYSQL_DB_NAME=${aws_db_instance.db_instance.name}" >> /etc/environment
-    echo "export MYSQL_UNAME=${aws_db_instance.db_instance.username}" >> /etc/environment
-    echo "export MYSQL_PWD=${var.db_pwd}" >> /etc/environment
-    echo "export MYSQL_HOST=${aws_db_instance.db_instance.address}" >> /etc/environment
-    echo "export MYSQL_PORT=${aws_db_instance.db_instance.port}" >> /etc/environment
-    echo "export AWS_S3_BUCKET=${aws_s3_bucket.b.id}" >> /etc/environment
-    echo "export LOGGING_FILE_PATH=${var.app_logging_path}" >> /etc/environment
-    echo "export LOGGING_LEVEL=${var.app_logging_level}" >> /etc/environment
-	EOF
+#   user_data = <<-EOF
+#     #!/bin/bash
+#     echo "export DEV_ENV=1" >> /etc/environment
+#     echo "export MYSQL_DB_NAME=${aws_db_instance.db_instance.name}" >> /etc/environment
+#     echo "export MYSQL_UNAME=${aws_db_instance.db_instance.username}" >> /etc/environment
+#     echo "export MYSQL_PWD=${var.db_pwd}" >> /etc/environment
+#     echo "export MYSQL_HOST=${aws_db_instance.db_instance.address}" >> /etc/environment
+#     echo "export MYSQL_PORT=${aws_db_instance.db_instance.port}" >> /etc/environment
+#     echo "export AWS_S3_BUCKET=${aws_s3_bucket.b.id}" >> /etc/environment
+#     echo "export LOGGING_FILE_PATH=${var.app_logging_path}" >> /etc/environment
+#     echo "export LOGGING_LEVEL=${var.app_logging_level}" >> /etc/environment
+# 	EOF
 
-  key_name = aws_key_pair.ec2_key.key_name
-  tags = {
-    Name = "app_${timestamp()}_tf"
-    For  = "app"
-  }
-}
+#   key_name = aws_key_pair.ec2_key.key_name
+#   tags = {
+#     Name = "app_${timestamp()}_tf"
+#     For  = "app"
+#   }
+# }
 
 resource "aws_dynamodb_table" "dynamodb_tbl" {
   name           = var.dynamodb_tbl_name
@@ -432,13 +432,13 @@ resource "aws_iam_user_policy_attachment" "att2" {
 #   value    = "${each.key} - ${each.value}"
 # }
 
-resource "aws_route53_record" "www" {
-  zone_id = var.hosted_zone_id
-  name    = var.api_subdomain_name
-  type    = "A"
-  ttl     = "60"
-  records = [aws_instance.app_instance.public_ip]
-}
+# resource "aws_route53_record" "www" {
+#   zone_id = var.hosted_zone_id
+#   name    = var.api_subdomain_name
+#   type    = "A"
+#   ttl     = "60"
+#   records = [aws_instance.app_instance.public_ip]
+# }
 
 resource "aws_iam_role" "cd_r" {
   name = var.cd_r_name
@@ -500,3 +500,209 @@ resource "aws_codedeploy_deployment_group" "cd_g" {
   #   enabled = true
   # }
 }
+
+
+resource "aws_launch_configuration" "asg_launch_config" {
+  image_id             = var.ami
+  instance_type        = var.instance_type
+  security_groups      = [aws_security_group.sg_app.id]
+  iam_instance_profile = aws_iam_instance_profile.ins_p.name
+  # depends_on
+  root_block_device {
+    volume_type = "gp2"
+    volume_size = 20
+    # delete_on_termination
+  }
+  user_data = <<-EOF
+    #!/bin/bash
+    echo "export DEV_ENV=1" >> /etc/environment
+    echo "export MYSQL_DB_NAME=${aws_db_instance.db_instance.name}" >> /etc/environment
+    echo "export MYSQL_UNAME=${aws_db_instance.db_instance.username}" >> /etc/environment
+    echo "export MYSQL_PWD=${var.db_pwd}" >> /etc/environment
+    echo "export MYSQL_HOST=${aws_db_instance.db_instance.address}" >> /etc/environment
+    echo "export MYSQL_PORT=${aws_db_instance.db_instance.port}" >> /etc/environment
+    echo "export AWS_S3_BUCKET=${aws_s3_bucket.b.id}" >> /etc/environment
+    echo "export LOGGING_FILE_PATH=${var.app_logging_path}" >> /etc/environment
+    echo "export LOGGING_LEVEL=${var.app_logging_level}" >> /etc/environment
+	EOF
+
+  key_name                    = aws_key_pair.ec2_key.key_name
+  associate_public_ip_address = true
+
+  lifecycle {
+    create_before_destroy = true
+  }
+}
+
+resource "aws_autoscaling_group" "as_g" {
+  name                 = var.as_g_name
+  launch_configuration = aws_launch_configuration.asg_launch_config.name
+  min_size             = 1
+  max_size             = 1
+  desired_capacity     = 1
+  default_cooldown     = 60
+  vpc_zone_identifier  = [for sub in aws_subnet.subs : sub.id]
+  load_balancers       = [aws_elb.l_b.name]
+
+  lifecycle {
+    create_before_destroy = true
+  }
+
+  tags = [
+    {
+      key                 = "For"
+      value               = "app"
+      propagate_at_launch = true
+    },
+    {
+      key                 = "Name"
+      value               = "app_${timestamp()}_tf"
+      propagate_at_launch = true
+    }
+  ]
+}
+
+resource "aws_autoscaling_policy" "scale_up" {
+  name                   = "WebServerScaleUpPolicy"
+  scaling_adjustment     = 1
+  adjustment_type        = "ChangeInCapacity"
+  cooldown               = 60
+  autoscaling_group_name = aws_autoscaling_group.as_g.name
+}
+
+resource "aws_autoscaling_policy" "scale_down" {
+  name                   = "WebServerScaleDownPolicy"
+  scaling_adjustment     = 1
+  adjustment_type        = "ChangeInCapacity"
+  cooldown               = 60
+  autoscaling_group_name = aws_autoscaling_group.as_g.name
+}
+
+resource "aws_cloudwatch_metric_alarm" "cpu_high" {
+  alarm_name          = "CPUAlarmHigh"
+  comparison_operator = "GreaterThanOrEqualToThreshold"
+  evaluation_periods  = "1"
+  metric_name         = "CPUUtilization"
+  namespace           = "AWS/EC2"
+  period              = "60"
+  statistic           = "Average"
+  threshold           = "5"
+
+  dimensions = {
+    AutoScalingGroupName = aws_autoscaling_group.as_g.name
+  }
+
+  alarm_description = "Scale-up if CPU > 8% for 1 minute"
+  alarm_actions     = [aws_autoscaling_policy.scale_up.arn]
+}
+
+resource "aws_cloudwatch_metric_alarm" "cpu_low" {
+  alarm_name          = "CPUAlarmLow"
+  comparison_operator = "LessThanThreshold"
+  evaluation_periods  = "1"
+  metric_name         = "CPUUtilization"
+  namespace           = "AWS/EC2"
+  period              = "60"
+  statistic           = "Average"
+  threshold           = "8"
+
+  dimensions = {
+    AutoScalingGroupName = aws_autoscaling_group.as_g.name
+  }
+
+  alarm_description = "Scale-down if CPU < 3% for 1 minute"
+  alarm_actions     = [aws_autoscaling_policy.scale_down.arn]
+}
+
+resource "aws_elb" "l_b" {
+  name    = "WebappLoadBalancer"
+  subnets = [for sub in aws_subnet.subs : sub.id]
+  # availability_zones = ["us-west-2a", "us-west-2b", "us-west-2c"]
+
+  # access_logs {
+  #   bucket        = "foo"
+  #   bucket_prefix = "bar"
+  #   interval      = 60
+  # }
+
+  listener {
+    instance_port     = 8000
+    instance_protocol = "http"
+    lb_port           = 80
+    lb_protocol       = "http"
+  }
+
+  listener {
+    instance_port      = 8000
+    instance_protocol  = "http"
+    lb_port            = 443
+    lb_protocol        = "https"
+    ssl_certificate_id = aws_acm_certificate_validation.cert_v.certificate_arn
+  }
+
+  health_check {
+    healthy_threshold   = 2
+    unhealthy_threshold = 2
+    timeout             = 3
+    target              = "HTTP:8000/v1/questions/"
+    interval            = 30
+  }
+
+  # instances                   = [aws_instance.foo.id]
+  cross_zone_load_balancing   = true
+  idle_timeout                = 400
+  connection_draining         = true
+  connection_draining_timeout = 400
+
+  tags = {
+    Name = "elb_tf"
+  }
+}
+
+resource "aws_route53_record" "elb_r" {
+  zone_id = var.hosted_zone_id
+  name    = var.api_subdomain_name
+  type    = "A"
+
+  alias {
+    name                   = aws_elb.l_b.dns_name
+    zone_id                = aws_elb.l_b.zone_id
+    evaluate_target_health = true
+  }
+}
+
+resource "aws_acm_certificate" "cert" {
+  domain_name       = var.api_subdomain_name
+  validation_method = "DNS"
+
+  # tags = {
+  #   Environment = "test"
+  # }
+
+  lifecycle {
+    create_before_destroy = true
+  }
+}
+
+resource "aws_route53_record" "cert_r" {
+  for_each = {
+    for dvo in aws_acm_certificate.cert.domain_validation_options : dvo.domain_name => {
+      name   = dvo.resource_record_name
+      record = dvo.resource_record_value
+      type   = dvo.resource_record_type
+    }
+  }
+
+  allow_overwrite = true
+  name            = each.value.name
+  records         = [each.value.record]
+  ttl             = 60
+  type            = each.value.type
+  zone_id         = var.hosted_zone_id
+}
+
+resource "aws_acm_certificate_validation" "cert_v" {
+  certificate_arn         = aws_acm_certificate.cert.arn
+  validation_record_fqdns = [for record in aws_route53_record.cert_r : record.fqdn]
+}
+
