@@ -76,18 +76,18 @@ resource "aws_security_group" "sg_app" {
     protocol    = "tcp"
     cidr_blocks = ["0.0.0.0/0"]
   }
-  ingress {
-    from_port   = 80
-    to_port     = 80
-    protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
-  ingress {
-    from_port   = 443
-    to_port     = 443
-    protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
+  # ingress {
+  #   from_port   = 80
+  #   to_port     = 80
+  #   protocol    = "tcp"
+  #   cidr_blocks = ["0.0.0.0/0"]
+  # }
+  # ingress {
+  #   from_port   = 443
+  #   to_port     = 443
+  #   protocol    = "tcp"
+  #   cidr_blocks = ["0.0.0.0/0"]
+  # }
   ingress {
     from_port   = 8000
     to_port     = 8000
@@ -618,6 +618,7 @@ resource "aws_elb" "l_b" {
   name    = "WebappLoadBalancer"
   subnets = [for sub in aws_subnet.subs : sub.id]
   # availability_zones = ["us-west-2a", "us-west-2b", "us-west-2c"]
+  security_groups = [aws_security_group.sg_lb.id]
 
   # access_logs {
   #   bucket        = "foo"
@@ -706,3 +707,28 @@ resource "aws_acm_certificate_validation" "cert_v" {
   validation_record_fqdns = [for record in aws_route53_record.cert_r : record.fqdn]
 }
 
+resource "aws_security_group" "sg_lb" {
+  name   = "lb_sg"
+  vpc_id = aws_vpc.vpc.id
+  ingress {
+    from_port   = 80
+    to_port     = 80
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+  ingress {
+    from_port   = 443
+    to_port     = 443
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+  egress {
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+  tags = {
+    Name = "sg_lb_${timestamp()}_tf"
+  }
+}
