@@ -71,28 +71,10 @@ resource "aws_security_group" "sg_app" {
   name   = "application"
   vpc_id = aws_vpc.vpc.id
   ingress {
-    from_port   = 22
-    to_port     = 22
-    protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
-  # ingress {
-  #   from_port   = 80
-  #   to_port     = 80
-  #   protocol    = "tcp"
-  #   cidr_blocks = ["0.0.0.0/0"]
-  # }
-  # ingress {
-  #   from_port   = 443
-  #   to_port     = 443
-  #   protocol    = "tcp"
-  #   cidr_blocks = ["0.0.0.0/0"]
-  # }
-  ingress {
-    from_port   = 8000
-    to_port     = 8000
-    protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
+    from_port       = 8000
+    to_port         = 8000
+    protocol        = "tcp"
+    security_groups = [aws_security_group.sg_lb.id]
   }
   egress {
     from_port   = 0
@@ -104,6 +86,44 @@ resource "aws_security_group" "sg_app" {
     Name = "sg_app_${timestamp()}_tf"
   }
 }
+
+# resource "aws_security_group" "sg_app" {
+#   name   = "application"
+#   vpc_id = aws_vpc.vpc.id
+#   ingress {
+#     from_port   = 22
+#     to_port     = 22
+#     protocol    = "tcp"
+#     cidr_blocks = ["0.0.0.0/0"]
+#   }
+#   ingress {
+#     from_port   = 80
+#     to_port     = 80
+#     protocol    = "tcp"
+#     cidr_blocks = ["0.0.0.0/0"]
+#   }
+#   ingress {
+#     from_port   = 443
+#     to_port     = 443
+#     protocol    = "tcp"
+#     cidr_blocks = ["0.0.0.0/0"]
+#   }
+#   ingress {
+#     from_port   = 8000
+#     to_port     = 8000
+#     protocol    = "tcp"
+#     cidr_blocks = ["0.0.0.0/0"]
+#   }
+#   egress {
+#     from_port   = 0
+#     to_port     = 0
+#     protocol    = "-1"
+#     cidr_blocks = ["0.0.0.0/0"]
+#   }
+#   tags = {
+#     Name = "sg_app_${timestamp()}_tf"
+#   }
+# }
 
 resource "aws_security_group" "sg_db" {
   name   = "database"
@@ -484,6 +504,14 @@ resource "aws_codedeploy_deployment_group" "cd_g" {
     }
   }
 
+  load_balancer_info {
+    elb_info {
+      name = aws_elb.l_b.name
+    }
+  }
+
+  autoscaling_groups = [aws_autoscaling_group.as_g.id]
+
   # trigger_configuration {
   #   trigger_events     = ["DeploymentFailure"]
   #   trigger_name       = "example-trigger"
@@ -537,9 +565,9 @@ resource "aws_launch_configuration" "asg_launch_config" {
 resource "aws_autoscaling_group" "as_g" {
   name                 = var.as_g_name
   launch_configuration = aws_launch_configuration.asg_launch_config.name
-  min_size             = 1
-  max_size             = 1
-  desired_capacity     = 1
+  min_size             = 3
+  max_size             = 5
+  desired_capacity     = 3
   default_cooldown     = 60
   vpc_zone_identifier  = [for sub in aws_subnet.subs : sub.id]
   load_balancers       = [aws_elb.l_b.name]
@@ -572,7 +600,7 @@ resource "aws_autoscaling_policy" "scale_up" {
 
 resource "aws_autoscaling_policy" "scale_down" {
   name                   = "WebServerScaleDownPolicy"
-  scaling_adjustment     = 1
+  scaling_adjustment     = -1
   adjustment_type        = "ChangeInCapacity"
   cooldown               = 60
   autoscaling_group_name = aws_autoscaling_group.as_g.name
@@ -580,19 +608,19 @@ resource "aws_autoscaling_policy" "scale_down" {
 
 resource "aws_cloudwatch_metric_alarm" "cpu_high" {
   alarm_name          = "CPUAlarmHigh"
-  comparison_operator = "GreaterThanOrEqualToThreshold"
+  comparison_operator = "GreaterThanThreshold"
   evaluation_periods  = "1"
   metric_name         = "CPUUtilization"
   namespace           = "AWS/EC2"
   period              = "60"
   statistic           = "Average"
-  threshold           = "5"
+  threshold           = "10"
 
   dimensions = {
     AutoScalingGroupName = aws_autoscaling_group.as_g.name
   }
 
-  alarm_description = "Scale-up if CPU > 8% for 1 minute"
+  alarm_description = "Scale-up if CPU > 10% for 1 minute"
   alarm_actions     = [aws_autoscaling_policy.scale_up.arn]
 }
 
@@ -604,13 +632,13 @@ resource "aws_cloudwatch_metric_alarm" "cpu_low" {
   namespace           = "AWS/EC2"
   period              = "60"
   statistic           = "Average"
-  threshold           = "8"
+  threshold           = "5"
 
   dimensions = {
     AutoScalingGroupName = aws_autoscaling_group.as_g.name
   }
 
-  alarm_description = "Scale-down if CPU < 3% for 1 minute"
+  alarm_description = "Scale-down if CPU < 5% for 1 minute"
   alarm_actions     = [aws_autoscaling_policy.scale_down.arn]
 }
 
@@ -645,7 +673,7 @@ resource "aws_elb" "l_b" {
     healthy_threshold   = 2
     unhealthy_threshold = 2
     timeout             = 3
-    target              = "HTTP:8000/v1/questions/"
+    target              = "HTTP:8000/"
     interval            = 30
   }
 
