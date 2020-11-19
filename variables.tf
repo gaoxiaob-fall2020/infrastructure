@@ -158,3 +158,7 @@ variable "app_logging_level" {
   default     = "DEBUG"
 }
 
+variable "as_g_name" {
+  description = "Name of autoscaling group"
+  default     = "WebServerGroup"
+}
