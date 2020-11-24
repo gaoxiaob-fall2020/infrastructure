@@ -55,3 +55,4 @@
     
     $ cd <repo-root>
     $ terraform destroy
+    
