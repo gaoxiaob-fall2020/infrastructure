@@ -272,7 +272,7 @@ resource "aws_dynamodb_table" "dynamodb_tbl" {
 resource "aws_iam_policy" "iam_p" {
   name = var.iam_p_name
   # path        = "/"
-  description = "IAM policy for EC2 instances to perform S3 buckets(put & delete files, and get app artifacts), and enable CloudWatch"
+  description = "IAM policy for EC2 instances to perform S3 buckets(put & delete files, and get app artifacts), and enable CloudWatch & SNS"
 
   policy = <<EOF
 {
@@ -302,6 +302,15 @@ resource "aws_iam_policy" "iam_p" {
       "Resource": [
         "arn:aws:s3:::${var.codedeploy_b_name}",
         "arn:aws:s3:::${var.codedeploy_b_name}/*"
+      ]
+    },
+    {
+      "Action": [
+          "sns:Publish"
+      ],
+      "Effect": "Allow",
+      "Resource": [
+        "${aws_sns_topic.sns_top.arn}"
       ]
     },
     {
@@ -382,6 +391,7 @@ resource "aws_iam_policy" "gh_p1" {
             "Effect": "Allow",
             "Action": [
                 "s3:PutObject",
+                "s3:GetObject",
                 "s3:ListBucket"
             ],
             "Resource": [
@@ -552,6 +562,8 @@ resource "aws_launch_configuration" "asg_launch_config" {
     echo "export AWS_S3_BUCKET=${aws_s3_bucket.b.id}" >> /etc/environment
     echo "export LOGGING_FILE_PATH=${var.app_logging_path}" >> /etc/environment
     echo "export LOGGING_LEVEL=${var.app_logging_level}" >> /etc/environment
+    echo "export AWS_SNS_TOPIC_ARN=${aws_sns_topic.sns_top.arn}" >> /etc/environment
+    echo "export AWS_DEFAULT_REGION=${var.region}" >> /etc/environment
 	EOF
 
   key_name                    = aws_key_pair.ec2_key.key_name
@@ -760,3 +772,169 @@ resource "aws_security_group" "sg_lb" {
     Name = "sg_lb_${timestamp()}_tf"
   }
 }
+
+
+# Setup SNS and Lambda
+resource "aws_sns_topic" "sns_top" {
+  name = "CreatePutDelAns"
+}
+
+resource "aws_iam_policy" "p_for_lambda" {
+  name        = "Lambda-To-DynamoDB-CloudWatch"
+  description = "allows lambda to perform DynamoDB and CloudWatch"
+  policy      = <<EOF
+{
+	"Version": "2012-10-17",
+	"Statement": [{
+			"Effect": "Allow",
+			"Action": [
+				"dynamodb:BatchGetItem",
+				"dynamodb:GetItem",
+				"dynamodb:Query",
+				"dynamodb:Scan",
+				"dynamodb:BatchWriteItem",
+				"dynamodb:PutItem",
+				"dynamodb:UpdateItem"
+			],
+			"Resource": "${aws_dynamodb_table.dynamodb_tbl.arn}"
+		},
+		{
+			"Effect": "Allow",
+			"Action": [
+				"logs:CreateLogStream",
+				"logs:PutLogEvents"
+			],
+			"Resource": "arn:aws:logs:${var.region}:${var.account_id}:*"
+		},
+		{
+			"Effect": "Allow",
+			"Action": "logs:CreateLogGroup",
+			"Resource": "*"
+		}
+	]
+}
+  EOF
+}
+
+resource "aws_iam_role" "iam_for_lambda" {
+  name = "LambdaToDynamoDBCloudWatchRole"
+
+  assume_role_policy = <<EOF
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Action": "sts:AssumeRole",
+      "Principal": {
+        "Service": "lambda.amazonaws.com"
+      },
+      "Effect": "Allow",
+      "Sid": ""
+    }
+  ]
+}
+EOF
+}
+
+resource "aws_iam_role_policy_attachment" "iam_role_policy_att" {
+  policy_arn = aws_iam_policy.p_for_lambda.arn
+  role       = aws_iam_role.iam_for_lambda.name
+}
+
+data "archive_file" "lambda_zip" {
+  type        = "zip"
+  source_file = "lambda_function.py"
+  output_path = "lambda_function.zip"
+}
+
+resource "aws_lambda_function" "lambda" {
+  filename      = "lambda_function.zip"
+  function_name = "serverless"
+  role          = aws_iam_role.iam_for_lambda.arn
+  handler       = "lambda_function.lambda_handler"
+
+  source_code_hash = data.archive_file.lambda_zip.output_base64sha256
+
+  runtime = "python3.6"
+
+  environment {
+    variables = {
+      DYNANODB_TABLE = aws_dynamodb_table.dynamodb_tbl.id
+    }
+  }
+}
+
+resource "aws_sns_topic_subscription" "sns_topic_sub" {
+  topic_arn = aws_sns_topic.sns_top.arn
+  protocol  = "lambda"
+  endpoint  = aws_lambda_function.lambda.arn
+}
+
+resource "aws_lambda_permission" "with_sns" {
+  statement_id  = "AllowExecutionFromSNS"
+  action        = "lambda:InvokeFunction"
+  function_name = aws_lambda_function.lambda.function_name
+  principal     = "sns.amazonaws.com"
+  source_arn    = aws_sns_topic.sns_top.arn
+}
+
+
+# github - serverless
+resource "aws_iam_user_policy_attachment" "att_for_serverless" {
+  user       = var.serverless_gh_iam
+  policy_arn = aws_iam_policy.gh_p1.arn
+}
+
+
+resource "aws_iam_policy" "gh_p3" {
+  name        = "GH-Update-Lambda-Function"
+  description = "allows GitHub Actions to update lambda function code"
+  policy      = <<EOF
+{
+    "Version": "2012-10-17",
+    "Statement": [
+        {
+            "Effect": "Allow",
+            "Action": [
+                "lambda:UpdateFunctionCode"
+            ],
+            "Resource": [
+                "${aws_lambda_function.lambda.arn}"
+            ]
+        }
+    ]
+}
+EOF
+}
+
+resource "aws_iam_user_policy_attachment" "att2_for_serverless" {
+  user       = var.serverless_gh_iam
+  policy_arn = aws_iam_policy.gh_p3.arn
+}
+
+# resource "aws_codedeploy_app" "lambda_cd_app" {
+#   compute_platform = "Lambda"
+#   name             = "serverless"
+# }
+
+# resource "aws_codedeploy_deployment_group" "lambda_cd_group" {
+#   app_name               = aws_codedeploy_app.lambda_cd_app.name
+#   deployment_group_name  = "serverless_group"
+#   service_role_arn       = aws_iam_role.cd_r.arn
+#   deployment_config_name = "CodeDeployDefault.AllAtOnce"
+
+#   ec2_tag_set {
+#     ec2_tag_filter {
+#       key   = "For"
+#       type  = "KEY_AND_VALUE"
+#       value = "app"
+#     }
+#   }
+
+#   auto_rollback_configuration {
+#     enabled = true
+#     events  = ["DEPLOYMENT_FAILURE"]
+#   }
+# }
+
+
