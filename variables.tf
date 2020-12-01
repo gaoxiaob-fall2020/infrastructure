@@ -162,3 +162,9 @@ variable "as_g_name" {
   description = "Name of autoscaling group"
   default     = "WebServerGroup"
 }
+
+
+variable "serverless_gh_iam" {
+  description = "IAM user name for serverless github actions"
+  default     = "serverless_cd"
+}
