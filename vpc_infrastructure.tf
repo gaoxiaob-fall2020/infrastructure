@@ -201,7 +201,8 @@ resource "aws_db_instance" "db_instance" {
   allocated_storage = 10
   engine            = "mysql"
   # engine_version         = "5.6.17"
-  instance_class         = "db.t3.micro"
+  # instance_class         = "db.t3.micro"
+  instance_class         = "db.m5.large"
   multi_az               = false
   identifier             = var.db_identifier
   name                   = var.db_name
@@ -210,7 +211,9 @@ resource "aws_db_instance" "db_instance" {
   db_subnet_group_name   = aws_db_subnet_group.db_subs.id
   vpc_security_group_ids = [aws_security_group.sg_db.id]
   # publicly_accessible    = false
-  skip_final_snapshot = true
+  skip_final_snapshot          = true
+  performance_insights_enabled = true
+  storage_encrypted            = true
 }
 
 resource "aws_key_pair" "ec2_key" {
@@ -666,12 +669,12 @@ resource "aws_elb" "l_b" {
   #   interval      = 60
   # }
 
-  listener {
-    instance_port     = 8000
-    instance_protocol = "http"
-    lb_port           = 80
-    lb_protocol       = "http"
-  }
+  # listener {
+  #   instance_port     = 8000
+  #   instance_protocol = "http"
+  #   lb_port           = 80
+  #   lb_protocol       = "http"
+  # }
 
   listener {
     instance_port      = 8000
