@@ -56,3 +56,10 @@
     $ cd <repo-root>
     $ terraform destroy
     
+
+## Import a Certificate Using the AWS CLI
+    $ aws acm import-certificate --certificate fileb://<location-of-certificate.crt> \
+                                 --private-key fileb://<location-of-private.key>\ 
+                                 --certificate-chain fileb://<location-of-certificateChain.ca-bundle> \
+                                 --profile <name>
+                                 	
